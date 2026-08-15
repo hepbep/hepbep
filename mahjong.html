@@ -1,0 +1,1811 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mahjong Ledger — Chinese Official Scoring</title>
+<meta name="description" content="A Chinese Official (MCR / playmahjong.io style) mahjong score calculator and running ledger for four players.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2216%22 fill=%22%23f3ecd9%22/><text x=%2250%22 y=%2268%22 font-size=%2260%22 text-anchor=%22middle%22 fill=%22%23b23b32%22 font-family=%22serif%22>發</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --felt-0:#0f2a21;
+    --felt-1:#153a2d;
+    --felt-2:#1c4738;
+    --tile:#f3ecd9;
+    --tile-hi:#fbf7ea;
+    --tile-edge:#d9c89e;
+    --ink:#26201a;
+    --ink-soft:#5a5145;
+    --red:#b23b32;
+    --red-soft:#e7c9c4;
+    --green:#5f7f4c;
+    --green-soft:#d7e2c9;
+    --gold:#c69a3a;
+    --gold-hi:#e2bd63;
+    --shadow: 0 6px 16px rgba(10,20,15,0.28), 0 1px 0 rgba(255,255,255,0.4) inset;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(1200px 600px at 50% -200px, rgba(255,255,255,0.05), transparent),
+      repeating-linear-gradient(135deg, rgba(255,255,255,0.015) 0 2px, transparent 2px 6px),
+      linear-gradient(180deg, var(--felt-0), var(--felt-1) 40%, var(--felt-0));
+    color:var(--tile);
+    font-family:'Source Serif 4', Georgia, serif;
+    min-height:100vh;
+    padding-bottom:60px;
+  }
+  h1,h2,h3, .display{ font-family:'Space Grotesk', sans-serif; letter-spacing:0.01em; }
+  .mono{ font-family:'IBM Plex Mono', monospace; }
+
+  header.top{
+    padding:28px 20px 22px;
+    text-align:center;
+    border-bottom:3px solid var(--gold);
+    background:linear-gradient(180deg, rgba(0,0,0,0.12), transparent);
+    position:relative;
+  }
+  header.top .glyph{
+    font-size:34px; color:var(--red); display:block; margin-bottom:4px;
+    text-shadow:0 2px 0 rgba(0,0,0,0.25);
+  }
+  header.top h1{ font-size:28px; margin:0 0 4px; font-weight:700; color:var(--tile-hi); }
+  header.top p{ margin:0; color:var(--gold-hi); font-size:14px; letter-spacing:0.04em; text-transform:uppercase; }
+
+  main{ max-width:900px; margin:0 auto; padding:22px 16px 0; display:flex; flex-direction:column; gap:22px; }
+
+  .panel{
+    background: linear-gradient(180deg, var(--tile-hi), var(--tile));
+    color:var(--ink);
+    border-radius:14px;
+    box-shadow:var(--shadow);
+    border:1px solid var(--tile-edge);
+    padding:18px 18px 20px;
+  }
+  .panel h2{
+    margin:0 0 14px;
+    font-size:17px;
+    display:flex; align-items:center; gap:8px;
+    color:var(--ink);
+  }
+  .panel h2 .tag{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px; color:var(--gold);
+    background:rgba(198,154,58,0.12);
+    border:1px solid rgba(198,154,58,0.4);
+    padding:2px 6px; border-radius:5px;
+  }
+  .subtle{ color:var(--ink-soft); font-size:13px; line-height:1.5; }
+
+  details.rules{
+    background:rgba(255,255,255,0.04);
+    border:1px solid rgba(198,154,58,0.35);
+    border-radius:10px;
+    padding:10px 14px;
+    color:var(--tile);
+  }
+  details.rules summary{ cursor:pointer; font-family:'Space Grotesk',sans-serif; font-weight:600; color:var(--gold-hi); }
+  details.rules .rules-body{ margin-top:10px; font-size:13.5px; line-height:1.6; color:#e8e2cf; }
+  details.rules .rules-body b{ color:var(--gold-hi); }
+
+  /* Players */
+  .players-grid{
+    display:grid; grid-template-columns:repeat(2,1fr); gap:12px;
+  }
+  @media(min-width:680px){ .players-grid{ grid-template-columns:repeat(4,1fr); } }
+  .house-rules{ margin-top:16px; padding-top:14px; border-top:1px solid var(--tile-edge); }
+  .house-rules-row{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  #minFanInput{
+    width:64px; padding:8px; border-radius:8px; border:1px solid var(--tile-edge);
+    font-family:'IBM Plex Mono',monospace; font-size:14px; color:var(--ink); background:#fff;
+    text-align:center;
+  }
+  .player-tile{
+    background:linear-gradient(180deg,#fff,var(--tile));
+    border:1px solid var(--tile-edge);
+    border-radius:12px;
+    padding:12px;
+    text-align:center;
+    box-shadow:0 3px 8px rgba(0,0,0,0.12) inset, var(--shadow);
+    position:relative;
+  }
+  .player-tile input.name{
+    width:100%;
+    text-align:center;
+    border:none;
+    background:transparent;
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:600;
+    font-size:14.5px;
+    color:var(--ink);
+    border-bottom:1.5px solid var(--tile-edge);
+    padding:2px 0 6px;
+    outline:none;
+    cursor:text;
+  }
+  .player-tile input.name:hover{ border-bottom-color:var(--gold); }
+  .player-tile input.name:focus{ border-bottom-color:var(--red); background:rgba(178,59,50,0.04); }
+  .player-tile .edit-hint{ font-size:10px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.05em; margin-top:2px; }
+  .player-tile .score{
+    margin-top:8px;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:26px;
+    font-weight:600;
+  }
+  .player-tile .score.pos{ color:var(--green); }
+  .player-tile .score.neg{ color:var(--red); }
+  .player-tile .score.zero{ color:var(--ink-soft); }
+
+  /* Segmented controls */
+  .seg{ display:flex; flex-wrap:wrap; gap:8px; }
+  .seg button{
+    flex:1 1 auto;
+    min-width:80px;
+    padding:9px 10px;
+    border-radius:9px;
+    border:1px solid var(--tile-edge);
+    background:#fff;
+    color:var(--ink);
+    font-family:'Space Grotesk',sans-serif;
+    font-size:13.5px;
+    font-weight:600;
+    cursor:pointer;
+    transition:all .12s ease;
+  }
+  .seg button:hover{ border-color:var(--gold); }
+  .seg button.selected{
+    background:linear-gradient(180deg, var(--green), #4c6a3c);
+    color:#fff;
+    border-color:#3f5a32;
+    box-shadow:0 2px 6px rgba(0,0,0,0.25) inset;
+  }
+  .seg button.selected.red-mode{
+    background:linear-gradient(180deg, var(--red), #8f2e27);
+    border-color:#7a2620;
+  }
+  .field-label{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:12.5px;
+    text-transform:uppercase;
+    letter-spacing:0.06em;
+    color:var(--ink-soft);
+    margin:14px 0 7px;
+    display:block;
+  }
+  .field-label:first-of-type{ margin-top:0; }
+
+  .stepper{ display:flex; align-items:center; gap:10px; }
+  .stepper button{
+    width:34px; height:34px; border-radius:8px; border:1px solid var(--tile-edge);
+    background:#fff; color:var(--ink); font-size:18px; font-weight:700; cursor:pointer;
+  }
+  .stepper button:hover{ border-color:var(--gold); }
+  .stepper .count{ font-family:'IBM Plex Mono',monospace; font-size:18px; min-width:26px; text-align:center; }
+
+  /* Fan pattern accordion */
+  .cat{ border:1px solid var(--tile-edge); border-radius:10px; margin-bottom:10px; overflow:hidden; background:#fffdf7; }
+  .cat summary{
+    list-style:none; cursor:pointer; padding:10px 14px;
+    display:flex; justify-content:space-between; align-items:center;
+    font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:14px;
+    background:linear-gradient(180deg,#fff,#f2ead4);
+  }
+  .cat summary::-webkit-details-marker{ display:none; }
+  .cat summary .count-badge{
+    font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--ink-soft);
+    background:rgba(0,0,0,0.05); padding:2px 7px; border-radius:20px;
+  }
+  .cat[open] summary{ border-bottom:1px solid var(--tile-edge); }
+  .chip-grid{ display:flex; flex-wrap:wrap; gap:7px; padding:12px 14px; }
+  .chip{
+    border:1px solid var(--tile-edge);
+    background:#fff;
+    padding:7px 10px;
+    border-radius:8px;
+    font-size:12.8px;
+    cursor:pointer;
+    display:flex; align-items:center; gap:6px;
+    color:var(--ink);
+    transition:all .12s ease;
+  }
+  .chip:hover{ border-color:var(--gold); }
+  .chip .pts{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    background:rgba(198,154,58,0.15);
+    border:1px solid rgba(198,154,58,0.4);
+    color:#8a6a1e;
+    padding:1px 5px;
+    border-radius:5px;
+  }
+  .chip.selected{
+    background:linear-gradient(180deg, var(--gold-hi), var(--gold));
+    border-color:#a67e2a;
+    color:#3a2a08;
+  }
+  .chip.selected .pts{ background:rgba(255,255,255,0.35); color:#3a2a08; border-color:rgba(255,255,255,0.5); }
+
+  /* Summary */
+  .summary{
+    margin-top:16px;
+    border-radius:10px;
+    padding:14px;
+    background:linear-gradient(180deg,#fff, #f2ead4);
+    border:1px solid var(--tile-edge);
+  }
+  .summary-row{ display:flex; justify-content:space-between; font-size:14px; padding:3px 0; }
+  .summary-row b{ font-family:'IBM Plex Mono',monospace; }
+  .warn{
+    margin-top:10px; padding:8px 10px; border-radius:8px;
+    background:var(--red-soft); color:#6b1f19; font-size:12.8px; font-weight:600;
+    border:1px solid #cf9a94;
+  }
+  .ok-badge{
+    margin-top:10px; padding:8px 10px; border-radius:8px;
+    background:var(--green-soft); color:#2f4a20; font-size:12.8px; font-weight:600;
+    border:1px solid #a9c290;
+  }
+  .deltas-preview{ display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+  .delta-chip{
+    font-family:'IBM Plex Mono',monospace; font-size:12.5px; padding:5px 9px; border-radius:7px;
+    border:1px solid var(--tile-edge); background:#fff;
+  }
+  .delta-chip.pos{ color:var(--green); border-color:#a9c290; background:var(--green-soft); }
+  .delta-chip.neg{ color:var(--red); border-color:#cf9a94; background:var(--red-soft); }
+
+  .btn-primary{
+    margin-top:16px;
+    width:100%;
+    padding:13px;
+    border-radius:10px;
+    border:1px solid #7a2620;
+    background:linear-gradient(180deg, var(--red), #8f2e27);
+    color:#fff;
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:700;
+    font-size:15px;
+    cursor:pointer;
+    letter-spacing:0.02em;
+  }
+  .btn-primary:disabled{ opacity:0.45; cursor:not-allowed; }
+  .btn-primary:hover:not(:disabled){ filter:brightness(1.06); }
+
+  .btn-secondary{
+    padding:9px 14px; border-radius:8px; border:1px solid var(--tile-edge);
+    background:#fff; color:var(--ink); font-family:'Space Grotesk',sans-serif;
+    font-weight:600; font-size:12.8px; cursor:pointer;
+  }
+  .btn-secondary:hover{ border-color:var(--red); color:var(--red); }
+
+  /* Tile builder */
+  details.tilebuilder{
+    border:1px solid var(--tile-edge); border-radius:10px; margin:14px 0 4px;
+    background:#fbf7ea;
+  }
+  details.tilebuilder summary{
+    cursor:pointer; padding:11px 14px; font-family:'Space Grotesk',sans-serif; font-weight:600;
+    font-size:14px; color:#5a4413; background:linear-gradient(180deg,#fff,#f0e6c9);
+    border-radius:10px;
+  }
+  details.tilebuilder[open] summary{ border-radius:10px 10px 0 0; border-bottom:1px solid var(--tile-edge); }
+  .tilebuilder-body{ padding:14px; }
+  .tile-grid{ display:flex; flex-direction:column; gap:5px; }
+  .tile-row{ display:grid; grid-template-columns:repeat(9,1fr); gap:4px; }
+  .tile-row.honor-row{ grid-template-columns:repeat(7,1fr); }
+  .tile-btn{
+    position:relative;
+    border:1px solid var(--tile-edge);
+    background:#fff;
+    border-radius:7px;
+    padding:9px 2px;
+    font-family:'Source Serif 4', serif;
+    font-size:13.5px;
+    color:var(--ink);
+    cursor:pointer;
+    text-align:center;
+    line-height:1.2;
+  }
+  .tile-btn .cn-label{ display:block; }
+  .tile-btn.honor-tile{ font-size:16px; padding:9px 2px; }
+  .tile-btn.dragon-red .cn-label{ color:var(--red); font-weight:700; }
+  .tile-btn.dragon-green .cn-label{ color:var(--green); font-weight:700; }
+  .tile-btn.dragon-white .cn-label{ color:var(--ink-soft); font-weight:700; }
+  .tile-btn.dragon-red.has-count .cn-label,
+  .tile-btn.dragon-green.has-count .cn-label,
+  .tile-btn.dragon-white.has-count .cn-label{ color:#3a2a08; }
+  .tile-btn.has-count{ background:linear-gradient(180deg,var(--gold-hi),var(--gold)); border-color:#a67e2a; color:#3a2a08; }
+  .tile-btn .count-badge{
+    position:absolute; top:-6px; right:-6px;
+    background:var(--red); color:#fff; font-size:10px; font-weight:700;
+    width:16px; height:16px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    box-shadow:0 1px 3px rgba(0,0,0,0.3);
+  }
+  .meld-builder{ display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+  .meld-builder select{
+    padding:7px 8px; border-radius:7px; border:1px solid var(--tile-edge);
+    font-family:'Space Grotesk',sans-serif; font-size:12.5px; background:#fff; color:var(--ink);
+  }
+  .kong-concealed-label{ font-size:12.5px; display:flex; align-items:center; gap:4px; color:var(--ink-soft); }
+  #winningTileSelect{
+    width:100%; padding:9px; border-radius:8px; border:1px solid var(--tile-edge);
+    font-family:'IBM Plex Mono',monospace; font-size:13px; background:#fff; color:var(--ink);
+  }
+  .wind-row{ display:flex; gap:12px; }
+  .wind-row > div{ flex:1; }
+  .mini-label{ display:block; font-size:11.5px; color:var(--ink-soft); margin-bottom:3px; font-family:'Space Grotesk',sans-serif; }
+  .wind-row select{
+    width:100%; padding:8px; border-radius:7px; border:1px solid var(--tile-edge);
+    font-family:'Space Grotesk',sans-serif; font-size:12.8px; background:#fff; color:var(--ink);
+  }
+  .meld-chip{
+    font-family:'IBM Plex Mono',monospace; font-size:12px; padding:5px 8px; border-radius:7px;
+    background:#fff; border:1px solid var(--tile-edge); display:flex; align-items:center; gap:6px;
+  }
+  .meld-chip button{ border:none; background:none; color:var(--red); cursor:pointer; font-size:13px; padding:0; }
+  .analyze-box{
+    margin-top:12px; padding:12px; border-radius:9px; background:#fff; border:1px solid var(--tile-edge); font-size:13px;
+  }
+  .analyze-box .breakdown-line{ padding:2px 0; }
+  .analyze-error{ color:#6b1f19; font-weight:600; }
+  .analyze-ok-total{ font-family:'IBM Plex Mono',monospace; font-size:16px; font-weight:700; color:var(--green); margin-bottom:6px; }
+
+  /* Ledger */
+  .ledger-row{
+    display:grid;
+    grid-template-columns: 34px 1fr auto;
+    gap:10px;
+    align-items:center;
+    padding:10px 0;
+    border-bottom:1px solid var(--tile-edge);
+  }
+  .ledger-row:last-child{ border-bottom:none; }
+  .ledger-round-no{
+    font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--ink-soft);
+    width:34px; height:34px; border-radius:50%; background:#f2ead4; border:1px solid var(--tile-edge);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .ledger-main .line1{ font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:14px; }
+  .ledger-main .line2{ font-size:12px; color:var(--ink-soft); margin-top:2px; }
+  .ledger-main .deltas{ display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+  .del-btn{
+    border:none; background:transparent; color:var(--ink-soft); cursor:pointer; font-size:16px;
+    padding:4px 8px;
+  }
+  .del-btn:hover{ color:var(--red); }
+  .empty-note{ color:var(--ink-soft); font-size:13.5px; text-align:center; padding:12px 0; }
+
+  .ledger-footer{ display:flex; justify-content:flex-end; gap:10px; margin-top:14px; }
+
+  footer.foot{
+    text-align:center; color:#a8b8ac; font-size:12px; padding:26px 16px 0;
+    line-height:1.6;
+  }
+  footer.foot a{ color:var(--gold-hi); }
+
+  @media (prefers-reduced-motion: reduce){ *{ transition:none !important; } }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <span class="glyph">發</span>
+  <h1>Mahjong Ledger</h1>
+  <p>Chinese Official (MCR) scoring, in the style of playmahjong.io</p>
+</header>
+
+<main>
+
+  <details class="rules">
+    <summary>How this calculator works</summary>
+    <div class="rules-body">
+      This uses the <b>Chinese Official / Competition Mahjong Rules (MCR)</b> scoring system that playmahjong.io runs on. A winning hand needs at least <b>8 fan</b> (before flowers) to be valid. Tap every scoring pattern the winning hand actually contains from the categorised list below — this calculator doesn't read tiles for you, so it trusts you to apply the <b>Non‑Repeat</b> (don't double count an implied pattern), <b>Non‑Identical</b> (one set can't score the same rule twice) and <b>Exclusionary</b> rules yourself, same as a real scorer would.
+      <br><br>
+      <b>Self‑drawn win:</b> every other player pays the winner (hand value + 8).<br>
+      <b>Discard win:</b> the player who fed the winning tile pays (hand value + 8), the other two just pay 8 each.<br><br>
+      Scores are saved on this device only (via your browser's local storage) — they won't sync between your phone and PC automatically.
+    </div>
+  </details>
+
+  <section class="panel">
+    <h2>Players <span class="tag">running totals</span></h2>
+    <div class="players-grid" id="playersGrid"></div>
+    <div class="house-rules">
+      <label class="mini-label" for="minFanInput">Minimum fan to win (house rule)</label>
+      <div class="house-rules-row">
+        <input type="number" id="minFanInput" min="0" max="88" step="1" value="8">
+        <span class="subtle">Only changes the "meets minimum" check below — not the +8 payment. Set to 0 to play without a minimum.</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Record a round</h2>
+
+    <span class="field-label">Winner</span>
+    <div class="seg" id="winnerSeg"></div>
+
+    <span class="field-label">Win type</span>
+    <div class="seg">
+      <button id="btnSelf" type="button">Self-drawn</button>
+      <button id="btnDiscard" type="button">Discard</button>
+    </div>
+
+    <div id="fedBySection" style="display:none;">
+      <span class="field-label">Fed by</span>
+      <div class="seg" id="fedBySeg"></div>
+    </div>
+
+    <span class="field-label">Flower / bonus tiles (winner's hand)</span>
+    <div class="stepper">
+      <button type="button" id="flowerMinus">−</button>
+      <span class="count mono" id="flowerCount">0</span>
+      <button type="button" id="flowerPlus">+</button>
+    </div>
+
+    <details class="tilebuilder" id="tileBuilderDetails">
+      <summary>Build the hand from tiles (auto-detect patterns)</summary>
+      <div class="tilebuilder-body">
+        <p class="subtle" style="margin-top:0;">Tap tiles to add them to the winner's concealed hand, declare any melds (revealed Chows/Pungs/Kongs), mark the winning tile, then analyze. This fills in the checklist below for you to review — it covers the great majority of the 81 MCR patterns but a handful of ultra-rare or table-state-only ones (Robbing the Kong, Out with Replacement, Last Tile Draw/Claim, Knitted Straight) aren't auto-detected — tick those manually if they apply.</p>
+
+        <span class="field-label">Concealed tiles <span class="mono" id="tileCountLabel">(0 / 14)</span></span>
+        <div class="tile-grid" id="tileGridHost"></div>
+        <button type="button" class="btn-secondary" id="clearTilesBtn" style="margin-top:8px;">Clear tiles</button>
+
+        <span class="field-label">Declared melds (revealed Chows / Pungs / Kongs)</span>
+        <div class="meld-builder">
+          <select id="meldType">
+            <option value="chow">Chow</option>
+            <option value="pung">Pung</option>
+            <option value="kong">Kong</option>
+          </select>
+          <select id="meldSuit">
+            <option value="m">万 Characters</option>
+            <option value="s">条 Bamboo</option>
+            <option value="p">筒 Dots</option>
+          </select>
+          <select id="meldChowStart"></select>
+          <select id="meldTile" style="display:none;"></select>
+          <label class="kong-concealed-label" id="meldKongLabel" style="display:none;">
+            <input type="checkbox" id="meldConcealed"> Concealed
+          </label>
+          <button type="button" class="btn-secondary" id="addMeldBtn">Add meld</button>
+        </div>
+        <div class="chip-grid" id="meldsList"></div>
+
+        <span class="field-label">Winning tile</span>
+        <select id="winningTileSelect"><option value="">— none selected —</option></select>
+
+        <span class="field-label">Wind context</span>
+        <div class="wind-row">
+          <div>
+            <label class="mini-label">Prevalent wind</label>
+            <select id="prevalentWindSelect">
+              <option value="">None</option>
+              <option value="We">East</option><option value="Ws">South</option>
+              <option value="Ww">West</option><option value="Wn">North</option>
+            </select>
+          </div>
+          <div>
+            <label class="mini-label">Winner's seat wind</label>
+            <select id="seatWindSelect">
+              <option value="">None</option>
+              <option value="We">East</option><option value="Ws">South</option>
+              <option value="Ww">West</option><option value="Wn">North</option>
+            </select>
+          </div>
+        </div>
+
+        <button class="btn-primary" type="button" id="analyzeBtn" style="background:linear-gradient(180deg, var(--green), #4c6a3c); border-color:#3f5a32;">Analyze hand</button>
+        <div id="analyzeResult"></div>
+      </div>
+    </details>
+
+    <span class="field-label">Scoring patterns in the winning hand</span>
+    <div id="patternsHost"></div>
+
+    <div class="summary" id="summaryHost"></div>
+
+    <button class="btn-primary" id="recordBtn" disabled>Select a winner to continue</button>
+  </section>
+
+  <section class="panel">
+    <h2>Ledger <span class="tag" id="roundCountTag">0 rounds</span></h2>
+    <div id="ledgerHost"></div>
+    <div class="ledger-footer">
+      <button class="btn-secondary" id="resetBtn">Reset all scores</button>
+    </div>
+  </section>
+
+</main>
+
+<footer class="foot">
+  Fan values &amp; the 8-point minimum follow Chinese Official Mahjong / MCR rules as documented by playmahjong.io.<br>
+  Built for keeping score across a real table — house rules may vary, so double-check unusual hands together.
+</footer>
+
+<script id="mj-engine-script">
+window.MJEngine = (function(){
+// ---------- Tile utilities ----------
+const SUITS = ['m','s','p'];
+const WINDS = ['We','Ws','Ww','Wn'];
+const DRAGONS = ['Dr','Dg','Dw'];
+const ALL_HONORS = [...WINDS, ...DRAGONS];
+
+function allTileTypes(){
+  const t=[];
+  SUITS.forEach(s=>{ for(let n=1;n<=9;n++) t.push(n+s); });
+  ALL_HONORS.forEach(h=>t.push(h));
+  return t;
+}
+const ALL_TYPES = allTileTypes();
+
+function poolFromList(list){
+  const p = {};
+  list.forEach(t=>{ p[t]=(p[t]||0)+1; });
+  return p;
+}
+function clonePool(p){ return Object.assign({}, p); }
+function poolTotal(p){ return Object.values(p).reduce((a,b)=>a+b,0); }
+
+// ---------- Suit decomposition (chow/pung/kong) ----------
+// counts: array length 10 (index 1..9), returns array of solutions; each solution: array of group {type,start}
+function decomposeSuitArr(counts){
+  counts = counts.slice();
+  // find first nonzero
+  let i = 1;
+  while(i<=9 && counts[i]===0) i++;
+  if(i>9) return [[]]; // one solution: empty
+  const solutions = [];
+  // try chow i,i+1,i+2
+  if(i<=7 && counts[i]>0 && counts[i+1]>0 && counts[i+2]>0){
+    const c2 = counts.slice();
+    c2[i]--; c2[i+1]--; c2[i+2]--;
+    const subs = decomposeSuitArr(c2);
+    subs.forEach(s=> solutions.push([{type:'chow', start:i}, ...s]));
+  }
+  // try pung
+  if(counts[i]>=3){
+    const c2 = counts.slice();
+    c2[i]-=3;
+    const subs = decomposeSuitArr(c2);
+    subs.forEach(s=> solutions.push([{type:'pung', start:i}, ...s]));
+  }
+  // try kong (uses all 4)
+  if(counts[i]===4){
+    const c2 = counts.slice();
+    c2[i]-=4;
+    const subs = decomposeSuitArr(c2);
+    subs.forEach(s=> solutions.push([{type:'kong', start:i, concealed:true}, ...s]));
+  }
+  return solutions;
+}
+
+function suitCountsFromPool(pool, suit){
+  const arr = new Array(10).fill(0);
+  for(let n=1;n<=9;n++) arr[n] = pool[n+suit]||0;
+  return arr;
+}
+
+function decomposeHonors(pool){
+  // returns array with a single solution (list of groups) or [] if invalid
+  const groups = [];
+  for(const h of ALL_HONORS){
+    const c = pool[h]||0;
+    if(c===0) continue;
+    if(c===3) groups.push({type:'pung', honor:h});
+    else if(c===4) groups.push({type:'kong', honor:h, concealed:true});
+    else return []; // 1 or 2 leftover honor tiles -> invalid (unless it's meant to be pair, handled earlier by removing pair first)
+  }
+  return [groups];
+}
+
+// Find all full concealed-arrangements (groups) for a pool matching exactly `needed` groups, given a pair already removed.
+function decomposeConcealed(pool, needed){
+  const suitSolutions = {};
+  for(const s of SUITS){
+    suitSolutions[s] = decomposeSuitArr(suitCountsFromPool(pool, s));
+  }
+  const honorSolutions = decomposeHonors(pool);
+  if(honorSolutions.length===0) return [];
+  const results = [];
+  // cartesian product across m,s,p,honors
+  for(const gm of suitSolutions['m']){
+    for(const gs of suitSolutions['s']){
+      for(const gp of suitSolutions['p']){
+        for(const gh of honorSolutions){
+          const combined = [
+            ...gm.map(g=>({...g, suit:'m', concealed:true})),
+            ...gs.map(g=>({...g, suit:'s', concealed:true})),
+            ...gp.map(g=>({...g, suit:'p', concealed:true})),
+            ...gh.map(g=>({...g, suit:'honor', concealed:true})),
+          ];
+          if(combined.length===needed) results.push(combined);
+        }
+      }
+    }
+  }
+  return results;
+}
+
+// full arrangements: melds (declared) + concealed groups + pair, for the given pool (concealed tiles only)
+function findStandardArrangements(pool, melds){
+  const needed = 4 - melds.length;
+  const arrangements = [];
+  const candidates = Object.keys(pool).filter(t=>pool[t]>=2);
+  for(const pairTile of candidates){
+    const rem = clonePool(pool);
+    rem[pairTile]-=2;
+    if(rem[pairTile]===0) delete rem[pairTile];
+    const concealedGroupSets = decomposeConcealed(rem, needed);
+    for(const cg of concealedGroupSets){
+      arrangements.push({
+        melds: melds,
+        concealedGroups: cg,
+        pair: pairTile,
+      });
+    }
+  }
+  return arrangements;
+}
+
+function isComplete(pool, melds){
+  return findStandardArrangements(pool, melds).length>0 ||
+         checkSevenPairs(pool, melds).ok || checkThirteenOrphans(pool, melds).ok;
+}
+
+// ---------- Special whole-hand patterns ----------
+function checkSevenPairs(pool, melds){
+  if(melds.length>0) return {ok:false};
+  const keys = Object.keys(pool);
+  if(keys.length!==7) return {ok:false};
+  if(!keys.every(k=>pool[k]===2)) return {ok:false};
+  return {ok:true, keys};
+}
+function checkSevenShiftedPairs(pool, melds){
+  const base = checkSevenPairs(pool, melds);
+  if(!base.ok) return {ok:false};
+  // all same suit, numbers consecutive shifted by 1 each (7 pairs -> 7 consecutive numbers impossible since max 9 numbers, so must be 7 consecutive from 1-9... wait need consecutive shift of 1: n, n+1,...,n+6 -> only fits if n=1..3 (1..7,2..8,3..9)
+  const suit = base.keys[0].slice(-1);
+  if(!SUITS.includes(suit)) return {ok:false};
+  if(!base.keys.every(k=>k.slice(-1)===suit)) return {ok:false};
+  const nums = base.keys.map(k=>parseInt(k)).sort((a,b)=>a-b);
+  for(let i=1;i<nums.length;i++) if(nums[i]!==nums[i-1]+1) return {ok:false};
+  return {ok:true};
+}
+function checkThirteenOrphans(pool, melds){
+  if(melds.length>0) return {ok:false};
+  const need = ['1m','9m','1s','9s','1p','9p',...ALL_HONORS];
+  const keys = Object.keys(pool);
+  if(!keys.every(k=>need.includes(k))) return {ok:false};
+  if(need.some(k=>!pool[k])) return {ok:false};
+  let pairCount = 0;
+  for(const k of need){ if((pool[k]||0)===2) pairCount++; else if((pool[k]||0)!==1) return {ok:false}; }
+  if(pairCount!==1) return {ok:false};
+  return {ok:true};
+}
+function checkHonorsKnitted(pool, melds){
+  // Lesser/Greater Honors and Knitted Tiles: singles of honors + one tile from each of 3 knitted residue-classes across suits
+  if(melds.length>0) return {ok:false, tier:null};
+  const keys = Object.keys(pool);
+  // must be all singles except possibly one pair (any tile) -> total 14 tiles, up to 7 honor types (singles) + knitted suit tiles (singles), one pair allowed among ANY of these
+  // knitted structure: choose an assignment of suits->residue classes {0:[1,4,7],1:[2,5,8],2:[3,6,9]}, tiles must be singles from allowed set = honors + these 9 numbers (one residue class per suit)
+  const residueSets = [[1,4,7],[2,5,8],[3,6,9]];
+  const perms = permute([0,1,2]);
+  for(const perm of perms){
+    const allowed = new Set(ALL_HONORS);
+    SUITS.forEach((s,i)=>{ residueSets[perm[i]].forEach(n=> allowed.add(n+s)); });
+    if(!keys.every(k=>allowed.has(k))) continue;
+    let pairCount=0, total=0, honorCount=0;
+    let valid = true;
+    for(const k of keys){
+      const c = pool[k];
+      total += c;
+      if(c===2) pairCount++;
+      else if(c!==1){ valid=false; break; }
+      if(ALL_HONORS.includes(k)) honorCount += c;
+    }
+    if(!valid) continue;
+    if(pairCount>1) continue;
+    if(total!==14) continue;
+    const tier = honorCount>=7 ? 'greater' : 'lesser';
+    return {ok:true, tier};
+  }
+  return {ok:false};
+}
+function permute(arr){
+  if(arr.length<=1) return [arr];
+  const res=[];
+  for(let i=0;i<arr.length;i++){
+    const rest = arr.slice(0,i).concat(arr.slice(i+1));
+    for(const p of permute(rest)) res.push([arr[i],...p]);
+  }
+  return res;
+}
+
+
+// ---------- Scoring an arrangement ----------
+function groupTiles(g){
+  // returns list of tile codes this group physically represents (for terminal/simple/honor checks) - just representative info
+  if(g.suit==='honor') return [g.honor,g.honor,g.honor, ...(g.type==='kong'?[g.honor]:[])];
+  const s=g.suit;
+  if(g.type==='chow') return [g.start+s,(g.start+1)+s,(g.start+2)+s];
+  const n = g.start;
+  return [n+s,n+s,n+s, ...(g.type==='kong'?[n+s]:[])];
+}
+function isHonorGroup(g){ return g.suit==='honor'; }
+function isTerminalOrHonorGroup(g){
+  if(isHonorGroup(g)) return true;
+  if(g.type==='chow') return false; // chow of terminals still contains 2-8 middle tiles, not "terminal group"
+  return g.start===1 || g.start===9;
+}
+function groupIsAllSimple(g){
+  if(isHonorGroup(g)) return false;
+  if(g.type==='chow') return g.start>1 && (g.start+2)<9; // 2-8 range roughly; more precise below
+  return g.start>=2 && g.start<=8;
+}
+
+function scoreArrangement(arr, ctx){
+  // arr: {melds, concealedGroups, pair} ; ctx: {winType, prevalentWind, seatWind, isSelfDraw, waitType, flowers}
+  const allGroups = [...arr.melds, ...arr.concealedGroups];
+  const pairTile = arr.pair;
+  const pairIsHonor = ALL_HONORS.includes(pairTile);
+  const patterns = []; // {id, name, points, count}
+  const add = (id,name,points,count)=>{ patterns.push({id,name,points:points*(count||1),count:count||1}); };
+
+  const suitsUsed = new Set();
+  allGroups.forEach(g=>{ if(!isHonorGroup(g)) suitsUsed.add(g.suit); });
+  if(!pairIsHonor){ suitsUsed.add(pairTile.slice(-1)); }
+
+  const chowGroups = allGroups.filter(g=>g.type==='chow');
+  const pungKongGroups = allGroups.filter(g=>g.type!=='chow');
+  const honorGroups = allGroups.filter(isHonorGroup);
+  const dragonGroups = honorGroups.filter(g=>DRAGONS.includes(g.honor));
+  const windGroups = honorGroups.filter(g=>WINDS.includes(g.honor));
+  const concealedPungs = allGroups.filter(g=>g.type==='pung' && g.concealed);
+  const concealedKongs = allGroups.filter(g=>g.type==='kong' && g.concealed);
+  const meldedKongs = allGroups.filter(g=>g.type==='kong' && !g.concealed);
+  const allKongs = allGroups.filter(g=>g.type==='kong');
+  const isFullyConcealed = arr.melds.length===0; // no claimed melds at all
+
+  // ---- Honor tile based ----
+  let dragonPungSuppressed = false;
+  if(dragonGroups.length===3){ add('big_three_dragons','Big Three Dragons',88); dragonPungSuppressed=true; }
+  else if(dragonGroups.length===2 && DRAGONS.includes(pairTile)){ add('little_three_dragons','Little Three Dragons',64); dragonPungSuppressed=true; }
+  if(!dragonPungSuppressed && dragonGroups.length>0) add('dragon_pung','Dragon Pung',2,dragonGroups.length);
+
+  let windPungSuppressed = false;
+  if(windGroups.length===4){ add('big_four_winds','Big Four Winds',88); windPungSuppressed=true; }
+  else if(windGroups.length===3 && WINDS.includes(pairTile)){ add('little_four_winds','Little Four Winds',64); windPungSuppressed=true; }
+  else if(windGroups.length===3){ add('big_three_winds','Big Three Winds',12); }
+  if(ctx.prevalentWind){
+    const g = windGroups.find(g=>g.honor===ctx.prevalentWind);
+    if(g) add('prevalent_wind','Pung of Prevalent Wind',2);
+  }
+  if(ctx.seatWind){
+    const g = windGroups.find(g=>g.honor===ctx.seatWind);
+    if(g) add('seat_wind','Pung of Seat Wind',2);
+  }
+  if(honorGroups.length===allGroups.length && allGroups.length===4){
+    add('all_honors','All Honors',64);
+  } else if(windPungSuppressed===false && false){}
+
+  // ---- Suit based ----
+  const numSuits = suitsUsed.size;
+  const hasHonorAnywhere = honorGroups.length>0 || pairIsHonor;
+  if(numSuits===1 && !hasHonorAnywhere){
+    add('full_flush','Full Flush',24);
+  } else if(numSuits===1 && hasHonorAnywhere){
+    add('half_flush','Half Flush',6);
+    add('no_honors_skip',null,0,0); // placeholder no-op
+  } else if(numSuits===0 && hasHonorAnywhere){
+    // all_honors already covers this exact case, skip extra suit pattern
+  }
+  if(numSuits===2 && !hasHonorAnywhere){
+    add('one_voided_suit','One Voided Suit',1);
+  }
+  if(!hasHonorAnywhere && numSuits>0 && !(numSuits===1)){
+    add('no_honors','No Honors',1);
+  }
+  // All Types: uses characters, dots, bamboos, winds, dragons all five
+  if(suitsUsed.has('m') && suitsUsed.has('s') && suitsUsed.has('p') && windGroups.length>0 && dragonGroups.length>0){
+    add('all_types','All Types',6);
+  }
+
+  // ---- Pung/Kong based ----
+  if(allGroups.every(g=>g.type!=='chow')){
+    if(honorGroups.length===0){
+       // could be all_even / all_terminals_honors handled below with implication suppression
+    }
+    add('all_pungs','All Pungs',6);
+  }
+  const termHonorGroups = allGroups.filter(isTerminalOrHonorGroup);
+  const allTermHonor = allGroups.every(isTerminalOrHonorGroup) && (pairTile.length===2 ? (pairTile[0]==='1'||pairTile[0]==='9') || ALL_HONORS.includes(pairTile) : true);
+  if(allTermHonor && allGroups.every(g=>g.type!=='chow')){
+    add('all_terminals_honors','All Terminals and Honors',32);
+  } else {
+    // stack pung/kong of terminals or honors individually (not double counted with all_terminals_honors)
+    const stackable = allGroups.filter(g=>g.type!=='chow' && isTerminalOrHonorGroup(g));
+    if(stackable.length>0) add('pung_terminals_honors','Pung of Terminals or Honors',1,stackable.length);
+  }
+  if(allGroups.every(g=> !isHonorGroup(g) && g.type!=='chow' && (g.start>=1&&g.start<=9) ) && allGroups.every(g=>g.start===1||g.start===9) && !ALL_HONORS.includes(pairTile) && (pairTile[0]==='1'||pairTile[0]==='9') && allGroups.length===4){
+    add('all_terminals','All Terminals',64);
+  }
+  if(allGroups.every(g=>g.type!=='chow' && !isHonorGroup(g) && g.start%2===0) && !ALL_HONORS.includes(pairTile) && parseInt(pairTile)%2===0){
+    add('all_even','All Even',24);
+  } else if(allGroups.every(g=>g.type!=='chow') && !hasHonorAnywhere && allGroups.every(g=>g.start>=2&&g.start<=8) && !ALL_HONORS.includes(pairTile) && parseInt(pairTile)>=2 && parseInt(pairTile)<=8){
+    add('all_simples','All Simples',2);
+  }
+  if(concealedKongs.length>0) add('concealed_kong','Concealed Kong',2,concealedKongs.length);
+  if(meldedKongs.length>0) add('melded_kong','Melded Kong',1,meldedKongs.length);
+  if(concealedKongs.length>=2) add('two_concealed_kongs','Two Concealed Kongs',6);
+  if(meldedKongs.length>=2) add('two_melded_kongs','Two Melded Kongs',4);
+  if(allKongs.length===4) add('four_kongs','Four Kongs',88);
+  else if(allKongs.length===3) add('three_kongs','Three Kongs',32);
+  const pureConcealedPungs = allGroups.filter(g=>g.type==='pung' && g.concealed);
+  if(pureConcealedPungs.length===4) add('four_concealed_pungs','Four Concealed Pungs',64);
+  else if(pureConcealedPungs.length===3) add('three_concealed_pungs','Three Concealed Pungs',16);
+  else if(pureConcealedPungs.length===2) add('two_concealed_pungs','Two Concealed Pungs',2);
+  // Double pung: two pungs (any, incl kong) of the same number across two suits
+  {
+    const byNum = {};
+    allGroups.filter(g=>g.type!=='chow' && !isHonorGroup(g)).forEach(g=>{
+      byNum[g.start] = byNum[g.start]||new Set(); byNum[g.start].add(g.suit);
+    });
+    let dpCount=0;
+    Object.values(byNum).forEach(set=>{ if(set.size>=2) dpCount++; });
+    if(dpCount>0) add('double_pung','Double Pung',2,dpCount);
+    if(Object.values(byNum).some(set=>set.size===3)) add('triple_pung','Triple Pung',16);
+  }
+  // Tile hog: a suited number used 4 times total across groups without being a kong
+  {
+    const usage = {};
+    allGroups.forEach(g=>{
+      if(isHonorGroup(g)) return;
+      const key = g.suit+'-'+ (g.type==='chow'? null : g.start);
+      if(g.type==='chow') return;
+      usage[key]=(usage[key]||0)+ (g.type==='kong'?4:3);
+    });
+    // also chows contribute 1 to each of their 3 numbers
+    allGroups.forEach(g=>{
+      if(g.type==='chow'){
+        for(let d=0;d<3;d++){ const key=g.suit+'-'+(g.start+d); usage[key]=(usage[key]||0)+1; }
+      }
+    });
+    let hogs=0;
+    Object.entries(usage).forEach(([key,count])=>{
+      const isKong = allGroups.some(g=>!isHonorGroup(g) && g.type==='kong' && (g.suit+'-'+g.start)===key);
+      if(count===4 && !isKong) hogs++;
+    });
+    if(hogs>0) add('tile_hog','Tile Hog',2,hogs);
+  }
+
+  // ---- Chow based ----
+  if(chowGroups.length===4){
+    add('all_chows','All Chows',2);
+  }
+  // group chows by suit
+  const chowsBySuit = {m:[],s:[],p:[]};
+  chowGroups.forEach(g=>chowsBySuit[g.suit].push(g.start));
+  SUITS.forEach(s=>chowsBySuit[s].sort((a,b)=>a-b));
+
+  // Pure double / short straight / two terminal chows / pure triple / pure shifted / four shifted / quadruple chow (within a suit)
+  SUITS.forEach(s=>{
+    const starts = chowsBySuit[s];
+    // count duplicates
+    const counts = {};
+    starts.forEach(v=>counts[v]=(counts[v]||0)+1);
+    Object.entries(counts).forEach(([v,c])=>{
+      if(c===4) add('quadruple_chow','Quadruple Chow',48);
+      else if(c===3) add('pure_triple_chow','Pure Triple Chow',24);
+      else if(c===2) add('pure_double_chow','Pure Double Chow',1);
+    });
+  });
+  // mixed double/triple chow across suits (same start value in 2 or 3 different suits)
+  {
+    const byStart = {};
+    chowGroups.forEach(g=>{ byStart[g.start]=byStart[g.start]||new Set(); byStart[g.start].add(g.suit); });
+    Object.values(byStart).forEach(set=>{
+      if(set.size===3) add('mixed_triple_chow','Mixed Triple Chow',8);
+      else if(set.size===2) add('mixed_double_chow','Mixed Double Chow',1);
+    });
+  }
+  // short straight (two consecutive starts, same suit) & pure shifted chows (3 in same suit, each shifted 1 or 2)
+  SUITS.forEach(s=>{
+    const starts = [...new Set(chowsBySuit[s])].sort((a,b)=>a-b);
+    for(let i=0;i<starts.length-1;i++){
+      if(starts[i+1]===starts[i]+1) add('short_straight','Short Straight',1);
+    }
+  });
+  // Pure straight: 1,4,7 starts present in one suit
+  SUITS.forEach(s=>{
+    const set = new Set(chowsBySuit[s]);
+    if(set.has(1)&&set.has(4)&&set.has(7)) add('pure_straight','Pure Straight',16);
+  });
+  // Mixed straight: starts 1,4,7 across three different suits (one suit each)
+  {
+    const starts147 = [1,4,7];
+    const suitsForStart = {};
+    starts147.forEach(st=>{ suitsForStart[st] = new Set(chowGroups.filter(g=>g.start===st).map(g=>g.suit)); });
+    // need each of 1,4,7 present, together spanning all 3 suits with one each
+    const combos = permute(SUITS);
+    let found=false;
+    combos.forEach(perm=>{
+      if(suitsForStart[1].has(perm[0]) && suitsForStart[4].has(perm[1]) && suitsForStart[7].has(perm[2])) found=true;
+    });
+    if(found) add('mixed_straight','Mixed Straight',8);
+  }
+  // Two terminal chows (123 & 789 same suit)
+  SUITS.forEach(s=>{
+    const set = new Set(chowsBySuit[s]);
+    if(set.has(1) && set.has(7)) add('two_terminal_chows','Two Terminal Chows',1);
+  });
+  // pure shifted chows: 3 chows same suit shifted by constant 1 or 2 (not both, and not already counted as pure triple/straight/short straight combo - we allow overlap flags per guide subtlety but keep simple)
+  SUITS.forEach(s=>{
+    const starts = chowsBySuit[s].slice().sort((a,b)=>a-b);
+    if(starts.length>=3){
+      for(let i=0;i+2<starts.length;i++){
+        const a=starts[i], b=starts[i+1], c=starts[i+2];
+        if(b-a===c-b && (b-a===1||b-a===2) && a!==b && b!==c){
+          add('pure_shifted_chows','Pure Shifted Chows',16);
+        }
+      }
+    }
+  });
+
+  // ---- Terminal based ----
+  const allNumsUsed = [];
+  allGroups.forEach(g=>{ if(!isHonorGroup(g)) allNumsUsed.push(...groupTiles(g).map(t=>parseInt(t))); });
+  if(!ALL_HONORS.includes(pairTile)) allNumsUsed.push(parseInt(pairTile), parseInt(pairTile));
+  if(allNumsUsed.length>0 && !hasHonorAnywhere){
+    if(allNumsUsed.every(n=>n>=6)) add('upper_four','Upper Four',12);
+    if(allNumsUsed.every(n=>n<=4)) add('lower_four','Lower Four',12);
+    if(allNumsUsed.every(n=>n>=7)) add('upper_tiles','Upper Tiles',24);
+    if(allNumsUsed.every(n=>n>=4&&n<=6)) add('middle_tiles','Middle Tiles',24);
+    if(allNumsUsed.every(n=>n<=3)) add('lower_tiles','Lower Tiles',24);
+    if(allNumsUsed.every(n=>n===5)) add('all_fives','All Fives',16);
+  }
+  if(allNumsUsed.length>0 && allNumsUsed.some(n=>n===5) && allGroups.length===4 && !hasHonorAnywhere){
+    // covered by all_fives check above already if truly all 5
+  }
+  // outside hand: every group + pair contains a terminal or honor
+  {
+    const groupHasTermHonor = g=> isHonorGroup(g) ? true : (g.type==='chow' ? (g.start===1||g.start===7) : (g.start===1||g.start===9));
+    const pairOk = ALL_HONORS.includes(pairTile) || pairTile[0]==='1' || pairTile[0]==='9';
+    if(allGroups.every(groupHasTermHonor) && pairOk && chowGroups.length>0){
+      add('outside_hand','Outside Hand',4);
+    }
+  }
+
+  // ---- Wait / concealment ----
+  if(isFullyConcealed && ctx.isSelfDraw) add('fully_concealed_hand','Fully Concealed Hand',4);
+  else if(isFullyConcealed && !ctx.isSelfDraw) add('concealed_hand','Concealed Hand',2);
+  if(arr.melds.length===4 && !ctx.isSelfDraw && ctx.waitType==='single') add('melded_hand','Melded Hand',6);
+  if(ctx.waitType==='edge') add('edge_wait','Edge Wait',1);
+  if(ctx.waitType==='closed') add('closed_wait','Closed Wait',1);
+  if(ctx.waitType==='single') add('single_wait','Single Wait',1);
+
+  // ---- de-duplicate / apply documented exclusions ----
+  let byId = {};
+  patterns.forEach(p=>{ if(p.id && p.id!=='no_honors_skip'){ byId[p.id] = (byId[p.id]||0)+p.points; } });
+
+  const suppress = (id)=>{ delete byId[id]; };
+  if(byId['all_even']!==undefined){ suppress('all_pungs'); suppress('all_simples'); }
+  if(byId['full_flush']!==undefined){ suppress('no_honors'); }
+  if(byId['upper_tiles']!==undefined || byId['middle_tiles']!==undefined || byId['lower_tiles']!==undefined){ suppress('no_honors'); }
+  if(byId['upper_four']!==undefined || byId['lower_four']!==undefined){ suppress('no_honors'); }
+  if(byId['all_terminals_honors']!==undefined){ suppress('all_pungs'); suppress('pung_terminals_honors'); }
+  if(byId['little_four_winds']!==undefined || byId['big_four_winds']!==undefined){ suppress('big_three_winds'); }
+  if(byId['all_honors']!==undefined){ suppress('all_pungs'); }
+  if(byId['all_terminals']!==undefined){ suppress('double_pung'); suppress('no_honors'); }
+  if(byId['four_concealed_pungs']!==undefined){ suppress('fully_concealed_hand'); suppress('all_pungs'); }
+  if(byId['big_four_winds']!==undefined){ suppress('all_pungs'); }
+  if(byId['big_three_dragons']!==undefined){ suppress('dragon_pung'); }
+
+  // ---- Reversible tiles / All Green (whole-hand tile-set checks) ----
+  {
+    const reversibleAllowed = new Set(['1s','2s','3s','4s','5s','8s','9s','2p','4p','5p','6p','8p','9p','Dw']);
+    const greenAllowed = new Set(['2s','3s','4s','6s','8s','Dg']);
+    const allTiles = [];
+    allGroups.forEach(g=>groupTiles(g).forEach(t=>allTiles.push(t)));
+    allTiles.push(pairTile, pairTile);
+    if(allTiles.every(t=>reversibleAllowed.has(t))) byId['reversible_tiles'] = 8;
+    if(allTiles.every(t=>greenAllowed.has(t))) byId['all_green'] = 88;
+  }
+
+  const total = Object.values(byId).reduce((a,b)=>a+b,0);
+  return { byId, total };
+}
+
+function checkNineGates(fullPool, melds, winningTile){
+  if(melds.length>0 || !winningTile) return {ok:false};
+  const suit = winningTile.slice(-1);
+  if(!SUITS.includes(suit)) return {ok:false};
+  const prior = clonePool(fullPool);
+  prior[winningTile]--; if(prior[winningTile]===0) delete prior[winningTile];
+  const canonical = {};
+  [1,2,3,4,5,6,7,8,9].forEach(n=>{ canonical[n+suit] = (n===1||n===9) ? 3 : 1; });
+  const keys = new Set([...Object.keys(prior), ...Object.keys(canonical)]);
+  for(const k of keys){ if((prior[k]||0) !== (canonical[k]||0)) return {ok:false}; }
+  return {ok:true};
+}
+
+
+// ---------- Wait type detection ----------
+function detectWaitType(fullPool, melds, winningTile){
+  const prior = clonePool(fullPool);
+  prior[winningTile]--; if(prior[winningTile]===0) delete prior[winningTile];
+  const waits = ALL_TYPES.filter(t=>{
+    const p2 = clonePool(prior);
+    p2[t] = (p2[t]||0)+1;
+    return isComplete(p2, melds);
+  });
+  if(waits.length!==1 || waits[0]!==winningTile) return null;
+  // find where winning tile slots in best arrangement
+  const arrangements = findStandardArrangements(fullPool, melds);
+  for(const arr of arrangements){
+    if(arr.pair===winningTile){
+      // check it's truly a single-wait: pair-completion (already checked global uniqueness above)
+      return 'single';
+    }
+    for(const g of arr.concealedGroups){
+      if(g.type==='chow'){
+        const s=g.suit, a=g.start;
+        const tiles=[a+s,(a+1)+s,(a+2)+s];
+        if(tiles.includes(winningTile)){
+          const w = parseInt(winningTile);
+          if(w===a+1) return 'closed';
+          if(w===a && a===7) return 'edge';
+          if(w===a+2 && a===1) return 'edge';
+        }
+      }
+    }
+  }
+  return null;
+}
+
+// ---------- Top level ----------
+function computeBest(fullTileList, melds, winningTile, ctx){
+  const pool = poolFromList(fullTileList);
+  const waitType = winningTile ? detectWaitType(pool, melds, winningTile) : null;
+  const fullCtx = Object.assign({}, ctx, {waitType});
+
+  let best = null;
+  const arrangements = findStandardArrangements(pool, melds);
+  arrangements.forEach(arr=>{
+    const res = scoreArrangement(arr, fullCtx);
+    if(!best || res.total>best.total) best = Object.assign({arrangement:arr, kind:'standard'}, res);
+  });
+  // special hands (only meaningful with 0 melds)
+  if(melds.length===0){
+    if(checkThirteenOrphans(pool, melds).ok){
+      const byId = {thirteen_orphans:88};
+      if(waitType==='edge') {} // exclusions: cannot combine with Concealed Hand/Single Wait/All Types -> just report flat 88 plus self-draw context handled outside
+      const total = 88;
+      if(!best || total>best.total) best = {kind:'thirteen_orphans', byId, total, arrangement:null};
+    }
+    const sp = checkSevenPairs(pool, melds);
+    if(sp.ok){
+      const ssp = checkSevenShiftedPairs(pool, melds);
+      const byId = ssp.ok ? {seven_shifted_pairs:88} : {seven_pairs:24};
+      const total = ssp.ok?88:24;
+      if(!best || total>best.total) best = {kind:'seven_pairs', byId, total, arrangement:null};
+    }
+    const hk = checkHonorsKnitted(pool, melds);
+    if(hk.ok){
+      const byId = hk.tier==='greater' ? {greater_honors_knitted:24} : {lesser_honors_knitted:12};
+      const total = hk.tier==='greater'?24:12;
+      if(!best || total>best.total) best = {kind:'honors_knitted', byId, total, arrangement:null};
+    }
+    const ng = checkNineGates(pool, melds, winningTile);
+    if(ng.ok){
+      // nine gates stacks on top of an underlying standard arrangement's other fan (full flush, concealed hand, etc.)
+      if(best && best.arrangement){
+        const withGates = Object.assign({}, best.byId, {nine_gates:88});
+        delete withGates['full_flush']; delete withGates['pung_terminals_honors'];
+        const total2 = Object.values(withGates).reduce((a,b)=>a+b,0);
+        if(total2>best.total) best = {kind:'standard', byId:withGates, total:total2, arrangement:best.arrangement};
+      } else {
+        best = {kind:'nine_gates', byId:{nine_gates:88}, total:88, arrangement:null};
+      }
+    }
+  }
+  // Chicken hand fallback: nothing at all scored from the hand shape itself
+  if(best && best.total===0){
+    const mf = (ctx && typeof ctx.minFan === "number") ? ctx.minFan : 8;
+    best = Object.assign({}, best, {byId:{chicken_hand:mf}, total:mf});
+  }
+  return { best, waitType };
+}
+
+
+  return { poolFromList, findStandardArrangements, checkSevenPairs, checkSevenShiftedPairs, checkThirteenOrphans, checkHonorsKnitted, checkNineGates, scoreArrangement, isComplete, computeBest, detectWaitType, ALL_TYPES, ALL_HONORS, WINDS, DRAGONS, SUITS };
+})();
+</script>
+<script>
+(function(){
+  "use strict";
+
+  /* ---------- Fan pattern data (MCR / Chinese Official, 81 patterns) ---------- */
+  const CATEGORIES = [
+    { name:"Honor tile based", patterns:[
+      ["dragon_pung","Dragon Pung",2],
+      ["prevalent_wind","Pung of Prevalent Wind",2],
+      ["seat_wind","Pung of Seat Wind",2],
+      ["two_dragons","Two Dragons",6],
+      ["big_three_winds","Big Three Winds",12],
+      ["little_four_winds","Little Four Winds",64],
+      ["little_three_dragons","Little Three Dragons",64],
+      ["all_honors","All Honors",64],
+      ["big_four_winds","Big Four Winds",88],
+      ["big_three_dragons","Big Three Dragons",88],
+    ]},
+    { name:"Chow based", patterns:[
+      ["pure_double_chow","Pure Double Chow",1],
+      ["mixed_double_chow","Mixed Double Chow",1],
+      ["short_straight","Short Straight",1],
+      ["two_terminal_chows","Two Terminal Chows",1],
+      ["all_chows","All Chows",2],
+      ["mixed_shifted_chows","Mixed Shifted Chows",6],
+      ["mixed_straight","Mixed Straight",8],
+      ["mixed_triple_chow","Mixed Triple Chow",8],
+      ["knitted_straight","Knitted Straight",12],
+      ["pure_straight","Pure Straight",16],
+      ["three_suited_terminal_chows","Three-Suited Terminal Chows",16],
+      ["pure_shifted_chows","Pure Shifted Chows",16],
+      ["pure_triple_chow","Pure Triple Chow",24],
+      ["four_shifted_chows","Four Shifted Chows",32],
+      ["quadruple_chow","Quadruple Chow",48],
+      ["pure_terminal_chows","Pure Terminal Chows",64],
+    ]},
+    { name:"Pung / Kong based", patterns:[
+      ["pung_terminals_honors","Pung of Terminals or Honors",1],
+      ["melded_kong","Melded Kong",1],
+      ["double_pung","Double Pung",2],
+      ["two_concealed_pungs","Two Concealed Pungs",2],
+      ["concealed_kong","Concealed Kong",2],
+      ["two_melded_kongs","Two Melded Kongs",4],
+      ["all_pungs","All Pungs",6],
+      ["two_concealed_kongs","Two Concealed Kongs",6],
+      ["mixed_shifted_pungs","Mixed Shifted Pungs",8],
+      ["triple_pung","Triple Pung",16],
+      ["three_concealed_pungs","Three Concealed Pungs",16],
+      ["all_even","All Even",24],
+      ["pure_shifted_pungs","Pure Shifted Pungs",24],
+      ["three_kongs","Three Kongs",32],
+      ["all_terminals_honors","All Terminals and Honors",32],
+      ["four_pure_shifted_pungs","Four Pure Shifted Pungs",48],
+      ["all_terminals","All Terminals",64],
+      ["four_concealed_pungs","Four Concealed Pungs",64],
+      ["four_kongs","Four Kongs",88],
+    ]},
+    { name:"Seven pairs", patterns:[
+      ["seven_pairs","Seven Pairs",24],
+      ["seven_shifted_pairs","Seven Shifted Pairs",88],
+    ]},
+    { name:"Suit based", patterns:[
+      ["one_voided_suit","One Voided Suit",1],
+      ["no_honors","No Honors",1],
+      ["half_flush","Half Flush",6],
+      ["all_types","All Types",6],
+      ["full_flush","Full Flush",24],
+      ["all_green","All Green",88],
+      ["nine_gates","Nine Gates",88],
+    ]},
+    { name:"Terminal based", patterns:[
+      ["all_simples","All Simples",2],
+      ["outside_hand","Outside Hand",4],
+      ["upper_four","Upper Four",12],
+      ["lower_four","Lower Four",12],
+      ["all_fives","All Fives",16],
+      ["upper_tiles","Upper Tiles",24],
+      ["middle_tiles","Middle Tiles",24],
+      ["lower_tiles","Lower Tiles",24],
+    ]},
+    { name:"Knitted tiles", patterns:[
+      ["lesser_honors_knitted","Lesser Honors &amp; Knitted Tiles",12],
+      ["greater_honors_knitted","Greater Honors &amp; Knitted Tiles",24],
+    ]},
+    { name:"Wait &amp; concealment", patterns:[
+      ["edge_wait","Edge Wait",1],
+      ["closed_wait","Closed Wait",1],
+      ["single_wait","Single Wait",1],
+      ["concealed_hand","Concealed Hand",2],
+      ["fully_concealed_hand","Fully Concealed Hand",4],
+      ["last_tile","Last Tile",4],
+      ["melded_hand","Melded Hand",6],
+      ["last_tile_draw","Last Tile Draw",8],
+      ["last_tile_claim","Last Tile Claim",8],
+      ["out_with_replacement","Out With Replacement Tile",8],
+      ["robbing_kong","Robbing The Kong",8],
+    ]},
+    { name:"Special hands", patterns:[
+      ["tile_hog","Tile Hog",2],
+      ["reversible_tiles","Reversible Tiles",8],
+      ["chicken_hand","Chicken Hand",8],
+      ["thirteen_orphans","Thirteen Orphans",88],
+    ]},
+  ];
+  const ALL_PATTERNS = {};
+  CATEGORIES.forEach(c=>c.patterns.forEach(p=>ALL_PATTERNS[p[0]]={name:p[1],points:p[2]}));
+
+  /* ---------- State ---------- */
+  const STORAGE_KEY = "mahjongLedgerState_v1";
+  let state = loadState();
+
+  function loadState(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if(raw){
+        const parsed = JSON.parse(raw);
+        if(parsed && Array.isArray(parsed.players) && Array.isArray(parsed.rounds)){
+          if(typeof parsed.minFan !== "number") parsed.minFan = 8;
+          return parsed;
+        }
+      }
+    }catch(e){}
+    return { players:["Player 1","Player 2","Player 3","Player 4"], rounds:[], minFan:8 };
+  }
+  function saveState(){
+    try{
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }catch(e){
+      // Storage can be unavailable (private browsing, locked-down browser settings, etc.)
+      // Scoring still works for the rest of this session, it just won't persist on reload.
+    }
+  }
+
+  /* Round builder (not persisted until recorded) */
+  let builder = {
+    winner: null,
+    winType: "self", // 'self' | 'discard'
+    fedBy: null,
+    flowers: 0,
+    selected: new Set(),
+  };
+
+  /* Tile builder state */
+  const TB = {
+    tiles: {},        // tile code -> count (concealed pool)
+    melds: [],         // {type, suit, start, tile, concealed}
+    winningTile: "",
+    prevalentWind: "",
+    seatWind: "",
+  };
+  const SUITS3 = ["m","s","p"];
+  const CN_NUM = ["","一","二","三","四","五","六","七","八","九"];
+  const SUIT_CN = {m:"万", s:"条", p:"筒"};
+  const SUIT_GROUP_LABEL = {m:"万 (Characters)", s:"条 (Bamboo)", p:"筒 (Dots)"};
+  const WIND_CODES = ["We","Ws","Ww","Wn"];
+  const WIND_CN = {We:"东", Ws:"南", Ww:"西", Wn:"北"};
+  const DRAGON_CODES = ["Dr","Dg","Dw"];
+  const DRAGON_CN = {Dr:"中", Dg:"发", Dw:"白"};
+
+  function tbTargetCount(){ return 14 - 3*TB.melds.length; }
+  function tbConcealedTotal(){ return Object.values(TB.tiles).reduce((a,b)=>a+b,0); }
+
+  function renderTileGrid(){
+    const host = document.getElementById("tileGridHost");
+    host.innerHTML = "";
+    SUITS3.forEach(suit=>{
+      const row = document.createElement("div");
+      row.className = "tile-row";
+      for(let n=1;n<=9;n++){
+        const code = n+suit;
+        const count = TB.tiles[code]||0;
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "tile-btn" + (count>0 ? " has-count":"");
+        btn.title = `${n} ${SUIT_GROUP_LABEL[suit].split(" ")[1]}`;
+        btn.innerHTML = `<span class="cn-label">${CN_NUM[n]}${SUIT_CN[suit]}</span>${count>0?`<span class="count-badge">${count}</span>`:""}`;
+        btn.addEventListener("click", ()=>{
+          TB.tiles[code] = ((TB.tiles[code]||0)+1) % 5;
+          if(TB.tiles[code]===0) delete TB.tiles[code];
+          renderTileGrid(); renderWinningTileOptions();
+        });
+        row.appendChild(btn);
+      }
+      host.appendChild(row);
+    });
+    const honorRow = document.createElement("div");
+    honorRow.className = "tile-row honor-row";
+    [...WIND_CODES, ...DRAGON_CODES].forEach(code=>{
+      const count = TB.tiles[code]||0;
+      const label = WIND_CN[code] || DRAGON_CN[code];
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "tile-btn honor-tile" + (count>0 ? " has-count":"") + (code==="Dr"?" dragon-red":"") + (code==="Dg"?" dragon-green":"") + (code==="Dw"?" dragon-white":"");
+      btn.title = tileDisplayName(code);
+      btn.innerHTML = `<span class="cn-label">${label}</span>${count>0?`<span class="count-badge">${count}</span>`:""}`;
+      btn.addEventListener("click", ()=>{
+        TB.tiles[code] = ((TB.tiles[code]||0)+1) % 5;
+        if(TB.tiles[code]===0) delete TB.tiles[code];
+        renderTileGrid(); renderWinningTileOptions();
+      });
+      honorRow.appendChild(btn);
+    });
+    host.appendChild(honorRow);
+
+    document.getElementById("tileCountLabel").textContent = `(${tbConcealedTotal()} / ${tbTargetCount()})`;
+  }
+
+  function tileDisplayName(code){
+    if(WIND_CODES.includes(code)) return `${WIND_CN[code]} (${{We:"East",Ws:"South",Ww:"West",Wn:"North"}[code]} Wind)`;
+    if(DRAGON_CODES.includes(code)) return `${DRAGON_CN[code]} (${{Dr:"Red",Dg:"Green",Dw:"White"}[code]} Dragon)`;
+    const n = code.slice(0,-1), s = code.slice(-1);
+    return `${CN_NUM[n]}${SUIT_CN[s]} (${n} ${{m:"Characters",s:"Bamboo",p:"Dots"}[s]})`;
+  }
+
+  function renderMeldControls(){
+    const type = document.getElementById("meldType").value;
+    document.getElementById("meldChowStart").style.display = type==="chow" ? "inline-block":"none";
+    document.getElementById("meldSuit").style.display = type==="chow" ? "inline-block":"none";
+    document.getElementById("meldTile").style.display = type==="chow" ? "none":"inline-block";
+    document.getElementById("meldKongLabel").style.display = type==="kong" ? "flex":"none";
+  }
+
+  function populateMeldSelectors(){
+    const chowStart = document.getElementById("meldChowStart");
+    chowStart.innerHTML = "";
+    for(let n=1;n<=7;n++){
+      const opt = document.createElement("option");
+      opt.value = n; opt.textContent = `${n}-${n+1}-${n+2}`;
+      chowStart.appendChild(opt);
+    }
+    const tileSel = document.getElementById("meldTile");
+    tileSel.innerHTML = "";
+    SUITS3.forEach(s=>{
+      const grp = document.createElement("optgroup");
+      grp.label = SUIT_GROUP_LABEL[s];
+      for(let n=1;n<=9;n++){
+        const opt = document.createElement("option");
+        opt.value = n+s; opt.textContent = `${CN_NUM[n]}${SUIT_CN[s]} (${n})`;
+        grp.appendChild(opt);
+      }
+      tileSel.appendChild(grp);
+    });
+    const honGrp = document.createElement("optgroup");
+    honGrp.label = "字牌 (Honors)";
+    [...WIND_CODES,...DRAGON_CODES].forEach(code=>{
+      const opt = document.createElement("option");
+      opt.value = code; opt.textContent = tileDisplayName(code);
+      honGrp.appendChild(opt);
+    });
+    tileSel.appendChild(honGrp);
+  }
+
+  function renderMeldsList(){
+    const host = document.getElementById("meldsList");
+    host.innerHTML = "";
+    TB.melds.forEach((m,i)=>{
+      const chip = document.createElement("div");
+      chip.className = "meld-chip";
+      let label;
+      if(m.type==="chow") label = `Chow ${CN_NUM[m.start]}${SUIT_CN[m.suit]}-${CN_NUM[m.start+1]}${SUIT_CN[m.suit]}-${CN_NUM[m.start+2]}${SUIT_CN[m.suit]}`;
+      else label = `${m.type==="kong"?"Kong":"Pung"} ${tileDisplayName(m.tile)}${m.type==="kong"?(m.concealed?" (concealed)":" (melded)"):""}`;
+      chip.innerHTML = `<span>${label}</span>`;
+      const rm = document.createElement("button");
+      rm.textContent = "✕";
+      rm.addEventListener("click", ()=>{ TB.melds.splice(i,1); renderMeldsList(); renderTileGrid(); });
+      chip.appendChild(rm);
+      host.appendChild(chip);
+    });
+    document.getElementById("tileCountLabel").textContent = `(${tbConcealedTotal()} / ${tbTargetCount()})`;
+  }
+
+  function renderWinningTileOptions(){
+    const sel = document.getElementById("winningTileSelect");
+    const prev = sel.value;
+    sel.innerHTML = `<option value="">— none selected —</option>`;
+    Object.keys(TB.tiles).forEach(code=>{
+      const opt = document.createElement("option");
+      opt.value = code; opt.textContent = tileDisplayName(code);
+      sel.appendChild(opt);
+    });
+    if([...sel.options].some(o=>o.value===prev)) sel.value = prev;
+  }
+
+  document.getElementById("meldType").addEventListener("change", renderMeldControls);
+  document.getElementById("clearTilesBtn").addEventListener("click", ()=>{
+    TB.tiles = {}; renderTileGrid(); renderWinningTileOptions();
+  });
+  document.getElementById("addMeldBtn").addEventListener("click", ()=>{
+    const type = document.getElementById("meldType").value;
+    if(type==="chow"){
+      const suit = document.getElementById("meldSuit").value;
+      const start = +document.getElementById("meldChowStart").value;
+      TB.melds.push({type:"chow", suit, start, concealed:false});
+    } else {
+      const tile = document.getElementById("meldTile").value;
+      const concealed = type==="kong" ? document.getElementById("meldConcealed").checked : false;
+      TB.melds.push({type, tile, concealed});
+    }
+    renderMeldsList();
+    renderTileGrid();
+  });
+  document.getElementById("winningTileSelect").addEventListener("change", e=>{ TB.winningTile = e.target.value; });
+  document.getElementById("prevalentWindSelect").addEventListener("change", e=>{ TB.prevalentWind = e.target.value; });
+  document.getElementById("seatWindSelect").addEventListener("change", e=>{ TB.seatWind = e.target.value; });
+
+  function meldsForEngine(){
+    return TB.melds.map(m=>{
+      if(m.type==="chow") return {type:"chow", suit:m.suit, start:m.start, concealed:false};
+      if(WIND_CODES.includes(m.tile) || DRAGON_CODES.includes(m.tile)){
+        return {type:m.type, suit:"honor", honor:m.tile, concealed: m.type==="kong" ? m.concealed : false};
+      }
+      const suit = m.tile.slice(-1), start = +m.tile.slice(0,-1);
+      return {type:m.type, suit, start, concealed: m.type==="kong" ? m.concealed : false};
+    });
+  }
+
+  document.getElementById("analyzeBtn").addEventListener("click", ()=>{
+    const resultHost = document.getElementById("analyzeResult");
+    const target = tbTargetCount();
+    const have = tbConcealedTotal();
+    if(have !== target){
+      resultHost.innerHTML = `<div class="analyze-box"><span class="analyze-error">You have ${have} concealed tiles but need ${target} (14 total minus 3 per declared meld). Add or remove tiles to match.</span></div>`;
+      return;
+    }
+    const fullList = [];
+    Object.entries(TB.tiles).forEach(([code,count])=>{ for(let i=0;i<count;i++) fullList.push(code); });
+    const melds = meldsForEngine();
+    const ctx = { isSelfDraw: builder.winType==="self", minFan: state.minFan };
+    let r;
+    try{
+      r = window.MJEngine.computeBest(fullList, melds, TB.winningTile||null, ctx);
+    }catch(e){
+      resultHost.innerHTML = `<div class="analyze-box"><span class="analyze-error">Couldn't analyze this hand — double check the tiles and melds.</span></div>`;
+      return;
+    }
+    if(!r.best){
+      resultHost.innerHTML = `<div class="analyze-box"><span class="analyze-error">This isn't a valid winning hand (no combination of Chows/Pungs/Kongs and a pair fits these tiles). Check the tiles and melds entered.</span></div>`;
+      return;
+    }
+    // apply prevalent/seat wind context by re-scoring standard arrangement if present
+    let byId = r.best.byId;
+    if(r.best.arrangement){
+      const res2 = window.MJEngine.scoreArrangement(r.best.arrangement, Object.assign({}, ctx, {waitType:r.waitType, prevalentWind:TB.prevalentWind||null, seatWind:TB.seatWind||null}));
+      byId = res2.byId;
+    }
+    // populate the manual checklist with detected ids that exist in our chip list
+    builder.selected = new Set(Object.keys(byId).filter(id=>ALL_PATTERNS[id]));
+    renderPatterns();
+    renderSummary();
+
+    const total = Object.values(byId).reduce((a,b)=>a+b,0);
+    let lines = Object.entries(byId).map(([id,pts])=>{
+      const name = (ALL_PATTERNS[id]||{}).name || id;
+      return `<div class="breakdown-line">${name} — <b class="mono">${pts}</b></div>`;
+    }).join("");
+    if(!lines) lines = `<div class="breakdown-line">No named patterns detected in the tile shape.</div>`;
+    resultHost.innerHTML = `
+      <div class="analyze-box">
+        <div class="analyze-ok-total">${total} fan detected</div>
+        ${r.waitType ? `<div class="breakdown-line">Wait type: <b>${r.waitType}</b></div>` : ""}
+        ${lines}
+        <div class="breakdown-line subtle" style="margin-top:6px;">Checklist below has been updated — review it, then set flowers and record the round.</div>
+      </div>`;
+  });
+
+  /* ---------- Rendering: players ---------- */
+  function totals(){
+    const t = [0,0,0,0];
+    state.rounds.forEach(r=>{ r.deltas.forEach((d,i)=>t[i]+=d); });
+    return t;
+  }
+
+  function renderPlayers(){
+    const grid = document.getElementById("playersGrid");
+    const t = totals();
+    grid.innerHTML = "";
+    state.players.forEach((name,i)=>{
+      const el = document.createElement("div");
+      el.className = "player-tile";
+      const scoreClass = t[i]>0?"pos":(t[i]<0?"neg":"zero");
+      const sign = t[i]>0?"+":"";
+      el.innerHTML = `
+        <input class="name" data-idx="${i}" value="${escapeAttr(name)}" maxlength="18" title="Tap to rename" placeholder="Player name" />
+        <div class="edit-hint">tap name to edit</div>
+        <div class="score mono ${scoreClass}">${sign}${t[i]}</div>
+      `;
+      grid.appendChild(el);
+    });
+    grid.querySelectorAll("input.name").forEach(inp=>{
+      inp.addEventListener("input", e=>{
+        const idx = +e.target.dataset.idx;
+        state.players[idx] = e.target.value || `Player ${idx+1}`;
+        saveState();
+        renderWinnerSeg();
+        renderFedBySeg();
+        renderLedger();
+        renderSummary();
+      });
+    });
+  }
+
+  function escapeAttr(s){ return String(s).replace(/&/g,"&amp;").replace(/"/g,"&quot;"); }
+  function escapeHtml(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;"); }
+
+  /* ---------- Rendering: winner / fed-by segmented controls ---------- */
+  function renderWinnerSeg(){
+    const host = document.getElementById("winnerSeg");
+    host.innerHTML = "";
+    state.players.forEach((name,i)=>{
+      const b = document.createElement("button");
+      b.type="button";
+      b.textContent = name;
+      if(builder.winner===i) b.classList.add("selected");
+      b.addEventListener("click", ()=>{
+        builder.winner = i;
+        if(builder.fedBy===i) builder.fedBy=null;
+        renderWinnerSeg(); renderFedBySeg(); renderSummary();
+      });
+      host.appendChild(b);
+    });
+  }
+
+  function renderFedBySeg(){
+    const host = document.getElementById("fedBySeg");
+    host.innerHTML = "";
+    state.players.forEach((name,i)=>{
+      if(builder.winner===i) return;
+      const b = document.createElement("button");
+      b.type="button";
+      b.textContent = name;
+      if(builder.fedBy===i) b.classList.add("selected","red-mode");
+      b.addEventListener("click", ()=>{
+        builder.fedBy = i;
+        renderFedBySeg(); renderSummary();
+      });
+      host.appendChild(b);
+    });
+    document.getElementById("fedBySection").style.display = builder.winType==="discard" ? "block":"none";
+  }
+
+  function renderWinType(){
+    document.getElementById("btnSelf").classList.toggle("selected", builder.winType==="self");
+    document.getElementById("btnDiscard").classList.toggle("selected", builder.winType==="discard");
+    document.getElementById("btnDiscard").classList.toggle("red-mode", builder.winType==="discard");
+    document.getElementById("fedBySection").style.display = builder.winType==="discard" ? "block":"none";
+  }
+
+  /* ---------- Rendering: pattern picker ---------- */
+  function renderPatterns(){
+    const host = document.getElementById("patternsHost");
+    host.innerHTML = "";
+    CATEGORIES.forEach((cat, ci)=>{
+      const det = document.createElement("details");
+      det.className = "cat";
+      if(ci===0) det.open = true;
+      const selectedInCat = cat.patterns.filter(p=>builder.selected.has(p[0])).length;
+      det.innerHTML = `<summary>${cat.name}<span class="count-badge">${selectedInCat?selectedInCat+" selected":cat.patterns.length+" patterns"}</span></summary>`;
+      const grid = document.createElement("div");
+      grid.className = "chip-grid";
+      cat.patterns.forEach(([id,name,pts])=>{
+        const chip = document.createElement("button");
+        chip.type="button";
+        chip.className = "chip" + (builder.selected.has(id)?" selected":"");
+        chip.innerHTML = `${name}<span class="pts">${pts}</span>`;
+        chip.addEventListener("click", ()=>{
+          if(builder.selected.has(id)) builder.selected.delete(id);
+          else builder.selected.add(id);
+          renderPatterns();
+          renderSummary();
+        });
+        grid.appendChild(chip);
+      });
+      det.appendChild(grid);
+      host.appendChild(det);
+    });
+  }
+
+  /* ---------- Scoring math ---------- */
+  function computeRound(){
+    const patternFan = [...builder.selected].reduce((s,id)=>s+ALL_PATTERNS[id].points,0);
+    const selfBonus = builder.winType==="self" ? 1 : 0;
+    const fan = patternFan + selfBonus;
+    const flowers = builder.flowers;
+    const handValue = fan + flowers;
+    const minMet = fan >= state.minFan;
+
+    const deltas = [0,0,0,0];
+    let valid = builder.winner!==null && (builder.winType==="self" || (builder.winType==="discard" && builder.fedBy!==null));
+
+    if(valid){
+      const others = [0,1,2,3].filter(i=>i!==builder.winner);
+      if(builder.winType==="self"){
+        const pay = handValue + 8;
+        others.forEach(i=>{ deltas[i]-=pay; deltas[builder.winner]+=pay; });
+      } else {
+        others.forEach(i=>{
+          const pay = (i===builder.fedBy) ? (handValue+8) : 8;
+          deltas[i]-=pay; deltas[builder.winner]+=pay;
+        });
+      }
+    }
+    return { patternFan, selfBonus, fan, flowers, handValue, minMet, deltas, valid };
+  }
+
+  function renderSummary(){
+    const host = document.getElementById("summaryHost");
+    const r = computeRound();
+    let html = "";
+    html += `<div class="summary-row"><span>Pattern fan</span><b>${r.patternFan}</b></div>`;
+    html += `<div class="summary-row"><span>Self-drawn bonus</span><b>+${r.selfBonus}</b></div>`;
+    html += `<div class="summary-row"><span>Fan total (min. ${state.minFan} to win)</span><b>${r.fan}</b></div>`;
+    html += `<div class="summary-row"><span>Flower tiles</span><b>+${r.flowers}</b></div>`;
+    html += `<div class="summary-row"><span>Hand value</span><b>${r.handValue}</b></div>`;
+
+    if(!r.minMet){
+      html += `<div class="warn">Fan total is below your ${state.minFan}-fan minimum for a valid win. You can still record it, but double check the pattern list first.</div>`;
+    } else {
+      html += `<div class="ok-badge">Meets the ${state.minFan}-fan minimum ✓</div>`;
+    }
+
+    if(builder.winner!==null){
+      html += `<div class="deltas-preview">`;
+      [0,1,2,3].forEach(i=>{
+        const d = r.deltas[i];
+        if(d===0) return;
+        const cls = d>0 ? "pos":"neg";
+        const sign = d>0?"+":"";
+        html += `<span class="delta-chip ${cls}">${escapeHtml(state.players[i])} ${sign}${d}</span>`;
+      });
+      html += `</div>`;
+    }
+    host.innerHTML = html;
+
+    const btn = document.getElementById("recordBtn");
+    if(builder.winner===null){
+      btn.disabled = true; btn.textContent = "Select a winner to continue";
+    } else if(builder.winType==="discard" && builder.fedBy===null){
+      btn.disabled = true; btn.textContent = "Select who fed the winning tile";
+    } else {
+      btn.disabled = false; btn.textContent = "Record round";
+    }
+  }
+
+  /* ---------- Ledger ---------- */
+  function renderLedger(){
+    const host = document.getElementById("ledgerHost");
+    document.getElementById("roundCountTag").textContent = state.rounds.length + (state.rounds.length===1?" round":" rounds");
+    if(state.rounds.length===0){
+      host.innerHTML = `<div class="empty-note">No rounds recorded yet — add one above to start the ledger.</div>`;
+      return;
+    }
+    host.innerHTML = "";
+    state.rounds.forEach((r, idx)=>{
+      const row = document.createElement("div");
+      row.className = "ledger-row";
+      const winTypeLabel = r.winType==="self" ? "Self-drawn" : `Fed by ${escapeHtml(r.playerNames[r.fedBy])}`;
+      let deltaHtml = "";
+      r.deltas.forEach((d,i)=>{
+        if(d===0) return;
+        const cls = d>0?"pos":"neg";
+        const sign = d>0?"+":"";
+        deltaHtml += `<span class="delta-chip ${cls}">${escapeHtml(r.playerNames[i])} ${sign}${d}</span>`;
+      });
+      row.innerHTML = `
+        <div class="ledger-round-no">${idx+1}</div>
+        <div class="ledger-main">
+          <div class="line1">${escapeHtml(r.playerNames[r.winner])} won — ${winTypeLabel}</div>
+          <div class="line2">Fan ${r.fan} · Flowers ${r.flowers} · Hand value ${r.handValue}${r.minMet?"":` · below ${r.minFan!==undefined?r.minFan:state.minFan} min`}</div>
+          <div class="deltas">${deltaHtml}</div>
+        </div>
+        <button class="del-btn" title="Remove this round" data-remove="${idx}">✕</button>
+      `;
+      host.appendChild(row);
+    });
+    host.querySelectorAll("[data-remove]").forEach(btn=>{
+      btn.addEventListener("click", e=>{
+        const idx = +e.target.dataset.remove;
+        state.rounds.splice(idx,1);
+        saveState();
+        renderPlayers();
+        renderLedger();
+      });
+    });
+  }
+
+  /* ---------- Actions ---------- */
+  function recordRound(){
+    const r = computeRound();
+    if(builder.winner===null) return;
+    if(builder.winType==="discard" && builder.fedBy===null) return;
+    if(!r.minMet){
+      const proceed = confirm(`This hand is below your ${state.minFan}-fan minimum. Record it anyway?`);
+      if(!proceed) return;
+    }
+    state.rounds.push({
+      winner: builder.winner,
+      winType: builder.winType,
+      fedBy: builder.fedBy,
+      patterns: [...builder.selected],
+      patternFan: r.patternFan,
+      fan: r.fan,
+      flowers: r.flowers,
+      handValue: r.handValue,
+      minMet: r.minMet,
+      minFan: state.minFan,
+      deltas: r.deltas,
+      playerNames: [...state.players],
+      timestamp: Date.now(),
+    });
+    saveState();
+
+    // reset builder but keep winType preference
+    builder.winner = null;
+    builder.fedBy = null;
+    builder.flowers = 0;
+    builder.selected = new Set();
+    document.getElementById("flowerCount").textContent = "0";
+
+    renderPlayers();
+    renderWinnerSeg();
+    renderFedBySeg();
+    renderPatterns();
+    renderSummary();
+    renderLedger();
+  }
+
+  function resetAll(){
+    if(!confirm("Reset the ledger and all running totals? This can't be undone.")) return;
+    state.rounds = [];
+    saveState();
+    renderPlayers();
+    renderLedger();
+  }
+
+  /* ---------- Wire up static controls ---------- */
+  document.getElementById("btnSelf").addEventListener("click", ()=>{
+    builder.winType="self"; builder.fedBy=null;
+    renderWinType(); renderFedBySeg(); renderSummary();
+  });
+  document.getElementById("btnDiscard").addEventListener("click", ()=>{
+    builder.winType="discard";
+    renderWinType(); renderFedBySeg(); renderSummary();
+  });
+  document.getElementById("flowerMinus").addEventListener("click", ()=>{
+    builder.flowers = Math.max(0, builder.flowers-1);
+    document.getElementById("flowerCount").textContent = builder.flowers;
+    renderSummary();
+  });
+  document.getElementById("flowerPlus").addEventListener("click", ()=>{
+    builder.flowers = Math.min(8, builder.flowers+1);
+    document.getElementById("flowerCount").textContent = builder.flowers;
+    renderSummary();
+  });
+  document.getElementById("recordBtn").addEventListener("click", recordRound);
+  document.getElementById("resetBtn").addEventListener("click", resetAll);
+  document.getElementById("minFanInput").addEventListener("change", e=>{
+    let v = parseInt(e.target.value, 10);
+    if(isNaN(v) || v<0) v = 0;
+    if(v>88) v = 88;
+    e.target.value = v;
+    state.minFan = v;
+    saveState();
+    renderSummary();
+  });
+
+  /* ---------- Init ---------- */
+  document.getElementById("minFanInput").value = state.minFan;
+  renderPlayers();
+  renderWinnerSeg();
+  renderWinType();
+  renderFedBySeg();
+  renderPatterns();
+  renderSummary();
+  renderLedger();
+  renderTileGrid();
+  populateMeldSelectors();
+  renderMeldControls();
+  renderMeldsList();
+  renderWinningTileOptions();
+
+})();
+</script>
+</body>
+</html>
