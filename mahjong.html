@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Mahjong calculator</title>
-<meta name="description" content="Mahjong score calculator">
+<title>mahjong calculator</title>
+<meta name="description" content="sum mahjong gang">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2216%22 fill=%22%23f3ecd9%22/><text x=%2250%22 y=%2268%22 font-size=%2260%22 text-anchor=%22middle%22 fill=%22%23b23b32%22 font-family=%22serif%22>發</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -200,6 +200,28 @@
     background:rgba(0,0,0,0.05); padding:2px 7px; border-radius:20px;
   }
   .cat[open] summary{ border-bottom:1px solid var(--tile-edge); }
+
+  /* Outer dropdown wrapping the whole manual checklist */
+  details.pattern-dropdown{
+    border:1px dashed var(--tile-edge); border-radius:10px; margin-top:16px;
+    background:rgba(255,255,255,0.4);
+  }
+  details.pattern-dropdown summary{
+    list-style:none; cursor:pointer; padding:11px 14px;
+    display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;
+    font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:13.5px; color:var(--ink-soft);
+  }
+  details.pattern-dropdown summary::-webkit-details-marker{ display:none; }
+  details.pattern-dropdown summary::before{
+    content:"▸"; margin-right:2px; color:var(--gold); transition:transform .15s ease;
+  }
+  details.pattern-dropdown[open] summary::before{ transform:rotate(90deg); }
+  details.pattern-dropdown summary .count-badge{
+    font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--ink-soft);
+    background:rgba(0,0,0,0.05); padding:2px 8px; border-radius:20px;
+  }
+  details.pattern-dropdown[open] summary{ border-bottom:1px dashed var(--tile-edge); }
+  .pattern-dropdown-body{ padding:12px 14px; }
   .chip-grid{ display:flex; flex-wrap:wrap; gap:7px; padding:12px 14px; }
   .chip{
     border:1px solid var(--tile-edge);
@@ -281,17 +303,23 @@
   }
   .btn-secondary:hover{ border-color:var(--red); color:var(--red); }
 
-  /* Tile builder */
-  details.tilebuilder{
-    border:1px solid var(--tile-edge); border-radius:10px; margin:14px 0 4px;
+  /* Tile builder — always visible, prominent */
+  .tilebuilder{
+    border:2px solid var(--gold); border-radius:12px; margin:16px 0 4px;
     background:#fbf7ea;
+    box-shadow:0 2px 10px rgba(198,154,58,0.18);
   }
-  details.tilebuilder summary{
-    cursor:pointer; padding:11px 14px; font-family:'Space Grotesk',sans-serif; font-weight:600;
-    font-size:14px; color:#5a4413; background:linear-gradient(180deg,#fff,#f0e6c9);
-    border-radius:10px;
+  .tilebuilder-heading{
+    padding:13px 14px; font-family:'Space Grotesk',sans-serif; font-weight:700;
+    font-size:15.5px; color:#5a4413; background:linear-gradient(180deg,#fff,#f0e6c9);
+    border-radius:10px 10px 0 0; border-bottom:1px solid var(--tile-edge);
+    display:flex; align-items:center; gap:8px; flex-wrap:wrap;
   }
-  details.tilebuilder[open] summary{ border-radius:10px 10px 0 0; border-bottom:1px solid var(--tile-edge); }
+  .tilebuilder-heading .tag{
+    font-family:'IBM Plex Mono', monospace; font-size:10.5px; color:var(--gold);
+    background:rgba(198,154,58,0.14); border:1px solid rgba(198,154,58,0.4);
+    padding:2px 7px; border-radius:20px; text-transform:none;
+  }
   .tilebuilder-body{ padding:14px; }
   .tile-grid{ display:flex; flex-direction:column; gap:5px; }
   .tile-row{ display:grid; grid-template-columns:repeat(9,1fr); gap:4px; }
@@ -405,14 +433,22 @@
       This uses the <b>Chinese Official / Competition Mahjong Rules (MCR)</b> scoring system that playmahjong.io runs on. A winning hand needs at least <b>8 fan</b> (before flowers) to be valid. Tap every scoring pattern the winning hand actually contains from the categorised list below — this calculator doesn't read tiles for you, so it trusts you to apply the <b>Non‑Repeat</b> (don't double count an implied pattern), <b>Non‑Identical</b> (one set can't score the same rule twice) and <b>Exclusionary</b> rules yourself, same as a real scorer would.
       <br><br>
       <b>Self‑drawn win:</b> every other player pays the winner (hand value + 8).<br>
-      <b>Discard win:</b> the player who fed the winning tile pays (hand value + 8), the other two just pay 8 each.<br><br>
+      <b>Discard win:</b> the player who fed the winning tile pays (hand value + 8), every other player just pays 8 each.<br><br>
+      This works for 3 or 4 players — switch the player count in the Players panel below and the payments adjust automatically.<br><br>
       Scores are saved on this device only (via your browser's local storage) — they won't sync between your phone and PC automatically.
     </div>
   </details>
 
   <section class="panel">
     <h2>Players <span class="tag">running totals</span></h2>
-    <div class="players-grid" id="playersGrid"></div>
+    <div class="house-rules" style="margin-top:0; padding-top:0; border-top:none;">
+      <label class="mini-label">Number of players</label>
+      <div class="seg" id="playerCountSeg">
+        <button type="button" data-count="3">3 Players</button>
+        <button type="button" data-count="4">4 Players</button>
+      </div>
+    </div>
+    <div class="players-grid" id="playersGrid" style="margin-top:14px;"></div>
     <div class="house-rules">
       <label class="mini-label" for="minFanInput">Minimum fan to win (house rule)</label>
       <div class="house-rules-row">
@@ -423,7 +459,10 @@
   </section>
 
   <section class="panel">
-    <h2>Record a round</h2>
+    <h2 style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+      <span>Record a round</span>
+      <button type="button" class="btn-secondary" id="clearHandBtn">Clear hand</button>
+    </h2>
 
     <span class="field-label">Winner</span>
     <div class="seg" id="winnerSeg"></div>
@@ -446,8 +485,8 @@
       <button type="button" id="flowerPlus">+</button>
     </div>
 
-    <details class="tilebuilder" id="tileBuilderDetails">
-      <summary>Build the hand from tiles (auto-detect patterns)</summary>
+    <div class="tilebuilder" id="tileBuilderDetails">
+      <div class="tilebuilder-heading">Build the hand from tiles <span class="tag">auto-detects patterns</span></div>
       <div class="tilebuilder-body">
         <p class="subtle" style="margin-top:0;">Tap tiles to add them to the winner's concealed hand, declare any melds (revealed Chows/Pungs/Kongs), mark the winning tile, then analyze. This fills in the checklist below for you to review — it covers the great majority of the 81 MCR patterns but a handful of ultra-rare or table-state-only ones (Robbing the Kong, Out with Replacement, Last Tile Draw/Claim, Knitted Straight) aren't auto-detected — tick those manually if they apply.</p>
 
@@ -502,10 +541,14 @@
         <button class="btn-primary" type="button" id="analyzeBtn" style="background:linear-gradient(180deg, var(--green), #4c6a3c); border-color:#3f5a32;">Analyze hand</button>
         <div id="analyzeResult"></div>
       </div>
-    </details>
+    </div>
 
-    <span class="field-label">Scoring patterns in the winning hand</span>
-    <div id="patternsHost"></div>
+    <details class="pattern-dropdown">
+      <summary>Scoring patterns checklist <span class="count-badge" id="patternsSummaryBadge">manual review / edit</span></summary>
+      <div class="pattern-dropdown-body">
+        <div id="patternsHost"></div>
+      </div>
+    </details>
 
     <div class="summary" id="summaryHost"></div>
 
@@ -1412,6 +1455,37 @@ function computeBest(fullTileList, melds, winningTile, ctx){
   document.getElementById("clearTilesBtn").addEventListener("click", ()=>{
     TB.tiles = {}; renderTileGrid(); renderWinningTileOptions();
   });
+  function clearHand(){
+    // Reset the tile builder
+    TB.tiles = {};
+    TB.melds = [];
+    TB.winningTile = "";
+    TB.prevalentWind = "";
+    TB.seatWind = "";
+    document.getElementById("prevalentWindSelect").value = "";
+    document.getElementById("seatWindSelect").value = "";
+    document.getElementById("analyzeResult").innerHTML = "";
+    renderTileGrid();
+    renderMeldsList();
+    renderWinningTileOptions();
+
+    // Reset the round builder (winner/win-type/fed-by/flowers/patterns)
+    builder.winner = null;
+    builder.winType = "self";
+    builder.fedBy = null;
+    builder.flowers = 0;
+    builder.selected = new Set();
+    document.getElementById("flowerCount").textContent = "0";
+    const dropdown = document.querySelector("details.pattern-dropdown");
+    if(dropdown) dropdown.open = false;
+
+    renderWinnerSeg();
+    renderWinType();
+    renderFedBySeg();
+    renderPatterns();
+    renderSummary();
+  }
+  document.getElementById("clearHandBtn").addEventListener("click", clearHand);
   document.getElementById("addMeldBtn").addEventListener("click", ()=>{
     const type = document.getElementById("meldType").value;
     if(type==="chow"){
@@ -1474,6 +1548,8 @@ function computeBest(fullTileList, melds, winningTile, ctx){
     builder.selected = new Set(Object.keys(byId).filter(id=>ALL_PATTERNS[id]));
     renderPatterns();
     renderSummary();
+    const dropdown = document.querySelector("details.pattern-dropdown");
+    if(dropdown) dropdown.open = true;
 
     const total = Object.values(byId).reduce((a,b)=>a+b,0);
     let lines = Object.entries(byId).map(([id,pts])=>{
@@ -1492,8 +1568,8 @@ function computeBest(fullTileList, melds, winningTile, ctx){
 
   /* ---------- Rendering: players ---------- */
   function totals(){
-    const t = [0,0,0,0];
-    state.rounds.forEach(r=>{ r.deltas.forEach((d,i)=>t[i]+=d); });
+    const t = new Array(state.players.length).fill(0);
+    state.rounds.forEach(r=>{ r.deltas.forEach((d,i)=>{ if(i<t.length) t[i]+=d; }); });
     return t;
   }
 
@@ -1600,6 +1676,10 @@ function computeBest(fullTileList, melds, winningTile, ctx){
       det.appendChild(grid);
       host.appendChild(det);
     });
+    const badge = document.getElementById("patternsSummaryBadge");
+    if(badge){
+      badge.textContent = builder.selected.size ? `${builder.selected.size} pattern${builder.selected.size===1?"":"s"} selected` : "manual review / edit";
+    }
   }
 
   /* ---------- Scoring math ---------- */
@@ -1611,11 +1691,11 @@ function computeBest(fullTileList, melds, winningTile, ctx){
     const handValue = fan + flowers;
     const minMet = fan >= state.minFan;
 
-    const deltas = [0,0,0,0];
+    const deltas = new Array(state.players.length).fill(0);
     let valid = builder.winner!==null && (builder.winType==="self" || (builder.winType==="discard" && builder.fedBy!==null));
 
     if(valid){
-      const others = [0,1,2,3].filter(i=>i!==builder.winner);
+      const others = state.players.map((_,i)=>i).filter(i=>i!==builder.winner);
       if(builder.winType==="self"){
         const pay = handValue + 8;
         others.forEach(i=>{ deltas[i]-=pay; deltas[builder.winner]+=pay; });
@@ -1649,7 +1729,7 @@ function computeBest(fullTileList, melds, winningTile, ctx){
       html += `<div class="deltas-preview">`;
       [0,1,2,3].forEach(i=>{
         const d = r.deltas[i];
-        if(d===0) return;
+        if(d===0 || i>=state.players.length) return;
         const cls = d>0 ? "pos":"neg";
         const sign = d>0?"+":"";
         html += `<span class="delta-chip ${cls}">${escapeHtml(state.players[i])} ${sign}${d}</span>`;
@@ -1743,6 +1823,17 @@ function computeBest(fullTileList, melds, winningTile, ctx){
     builder.selected = new Set();
     document.getElementById("flowerCount").textContent = "0";
 
+    // reset the tile builder for the next round
+    TB.tiles = {};
+    TB.melds = [];
+    TB.winningTile = "";
+    document.getElementById("analyzeResult").innerHTML = "";
+    renderTileGrid();
+    renderMeldsList();
+    renderWinningTileOptions();
+    const dropdown = document.querySelector("details.pattern-dropdown");
+    if(dropdown) dropdown.open = false;
+
     renderPlayers();
     renderWinnerSeg();
     renderFedBySeg();
@@ -1758,6 +1849,35 @@ function computeBest(fullTileList, melds, winningTile, ctx){
     renderPlayers();
     renderLedger();
   }
+
+  function renderPlayerCountSeg(){
+    const host = document.getElementById("playerCountSeg");
+    [...host.children].forEach(btn=>{
+      btn.classList.toggle("selected", +btn.dataset.count === state.players.length);
+    });
+  }
+  function setPlayerCount(n){
+    if(n === state.players.length) return;
+    if(n === 3 && state.players.length === 4){
+      state.savedFourthPlayerName = state.players[3];
+      state.players = state.players.slice(0,3);
+      if(builder.winner === 3) builder.winner = null;
+      if(builder.fedBy === 3) builder.fedBy = null;
+    } else if(n === 4 && state.players.length === 3){
+      state.players = [...state.players, state.savedFourthPlayerName || "Player 4"];
+    }
+    saveState();
+    renderPlayerCountSeg();
+    renderPlayers();
+    renderWinnerSeg();
+    renderFedBySeg();
+    renderSummary();
+  }
+  document.getElementById("playerCountSeg").addEventListener("click", e=>{
+    const btn = e.target.closest("button[data-count]");
+    if(!btn) return;
+    setPlayerCount(+btn.dataset.count);
+  });
 
   /* ---------- Wire up static controls ---------- */
   document.getElementById("btnSelf").addEventListener("click", ()=>{
@@ -1792,6 +1912,7 @@ function computeBest(fullTileList, melds, winningTile, ctx){
 
   /* ---------- Init ---------- */
   document.getElementById("minFanInput").value = state.minFan;
+  renderPlayerCountSeg();
   renderPlayers();
   renderWinnerSeg();
   renderWinType();
