@@ -1,4 +1,4 @@
-## Hi there 👋
+## this is my github site with some bullshit thats 90% claude generated
 
 <!--
 **hepbep/hepbep** is a ✨ _special_ ✨ repository because its `README.md` (this file) appears on your GitHub profile.
